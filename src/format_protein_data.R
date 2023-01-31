@@ -178,12 +178,12 @@ n_v_o <- ggplot(data=quad.sub) +
     scale_x_continuous(breaks=0, labels=NULL) +
     scale_y_continuous(breaks=0, labels=NULL)
 
-ggsave(c_v_i, file='cardio-v-inflammation.png', width=20, height=10, units='cm')
-ggsave(c_v_n, file='cardio-v-neuro.png', width=20, height=10, units='cm')
-ggsave(c_v_o, file='cardio-v-onco.png', width=20, height=10, units='cm')
-ggsave(i_v_n, file='inflammation-v-neuro.png', width=20, height=10, units='cm')
-ggsave(i_v_o, file='inflammation-v-onco.png', width=20, height=10, units='cm')
-ggsave(n_v_o, file='neuro-v-onco.png', width=20, height=10, units='cm')
+ggsave(c_v_i, file='figs/cardio-v-inflammation.png', width=20, height=10, units='cm')
+ggsave(c_v_n, file='figs/cardio-v-neuro.png', width=20, height=10, units='cm')
+ggsave(c_v_o, file='figs/cardio-v-onco.png', width=20, height=10, units='cm')
+ggsave(i_v_n, file='figs/inflammation-v-neuro.png', width=20, height=10, units='cm')
+ggsave(i_v_o, file='figs/inflammation-v-onco.png', width=20, height=10, units='cm')
+ggsave(n_v_o, file='figs/neuro-v-onco.png', width=20, height=10, units='cm')
 
 
 

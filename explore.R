@@ -4,75 +4,82 @@ library(data.table)
 library(foreach)
 library(ggplot2)
 
-# data directory
-dd='/data/CARD/projects/proteomicsXprogression_PD/data-allreleases/'
 
-# merge mds1, 2, and 3
-mds1 <- fread(paste0(dd, '/amp-pd-v25-clinical/clinical/MDS_UPDRS_Part_I.csv'))
-mds1 <- mds1[, c('participant_id','visit_month','mds_updrs_part_i_summary_score')]
-setkey(mds1, participant_id, visit_month)
+dd <- '/data/CARD/projects/proteomicsXprogression_PD/data-allreleases/amp-pd-v3-proteomics/'
+filenames <- list.files(path=dd, pattern="D0[12]_matrix_.*csv$", recursive=T, full.names=T)
 
-mds2 <- fread(paste0(dd, '/amp-pd-v25-clinical/clinical/MDS_UPDRS_Part_II.csv'))
-mds2 <- mds2[, c('participant_id','visit_month','mds_updrs_part_ii_summary_score')]
-setkey(mds2, participant_id, visit_month)
+# combine data sets and transform to long format
+dat <- foreach(filename=filenames, .combine='rbind') %do% {
+        mode <- strsplit(basename(filename), split='_matrix_|\\.csv')[[1]][2]
+        dat.tmp <- fread(filename)
+        dat.tmp.long <- melt(dat.tmp, 
+                             measure.vars=colnames(dat.tmp)[2:ncol(dat.tmp)],
+                             variable.name='sample')
+        dat.tmp.long[, 'mode' := mode]
+        return(dat.tmp.long[])
+        }
 
-mds3 <- fread(paste0(dd, '/amp-pd-v25-clinical/clinical/MDS_UPDRS_Part_III.csv'))
-mds3 <- mds3[, c('participant_id','visit_month','mds_updrs_part_iii_summary_score')]
-setkey(mds3, participant_id, visit_month)
+# split 'variable' column into its separate values
+dat[, c('dataset', 'participant_id', 'visit', 'sampletype', 'ppea', 'D') :=
+        tstrsplit(sample, split='-')]
 
-merge1 <- merge(mds1, mds2, all=TRUE)
-merge2 <- merge(merge1, mds3, all=TRUE)
+# remove redundant 'sample' column
+dat[, sample := NULL]
 
-setnames(merge2, 'mds_updrs_part_i_summary_score', 'mds_i')
-setnames(merge2, 'mds_updrs_part_ii_summary_score', 'mds_ii')
-setnames(merge2, 'mds_updrs_part_iii_summary_score', 'mds_iii')
+# reduce file size
 
-dat <- melt(merge2, measure.vars=c('mds_i', 'mds_ii', 'mds_iii'),
-            variable_name='mds_section', value.name='summary_score')
+## is the number after BLM and SVM always month?
+## What is difference between BLM and SVM?
+## BL = Baseline?
 
-# some patients have multiple scores for a given time point, take average per month
-dat <- dat[, list('summary_score'=mean(summary_score, na.rm=T)), by=list(participant_id, visit_month, variable)]
-dat <- dat[! is.na(summary_score)]
+dat[visit=="BLM0T1",  month:= 0 ]
+dat[visit=="SVM3T1",  month:= 3 ]
+dat[visit=="SVM6T1",  month:= 6 ]
+dat[visit=="SVM9T1",  month:= 9 ]
+dat[visit=="SVM12T1", month:= 12]
+dat[visit=="SVM18T1", month:= 18]
+dat[visit=="SVM24T1", month:= 24]
+dat[visit=="SVM30T1", month:= 30]
+dat[visit=="SVM36T1", month:= 36]
+dat[visit=="SVM42T1", month:= 42]
+dat[visit=="SVM48T1", month:= 48]
+dat[visit=="SVM54T1", month:= 54]
+dat[visit=="SVM60T1", month:= 60]
+dat[visit=="SVM72T1", month:= 72]
+dat[visit=="SVM84T1", month:= 84]
+dat[visit=="SVM96T1", month:= 96]
+dat[, visit := NULL]
+
+# Simplify D02 to 2, D01 to 1
+dat[D=='D02', D := '2']
+dat[D=='D01', D := '1']
+
+# Renumber participant_ids for file size reduction? 413 participants
+# id_key <- data.table(participant_id=unique(dat$participant_id))
+# id_key[, idx := 1:.N]
+# setkey(id_key, idx)
+# dat <- merge(dat, id_key, by.x='participant_id', by.y='participant_id')
+
+fwrite(dat, file='reports/protein_quantification.tsv', quote=F, row.names=F, col.names=T, sep='\t')
+
+# # calculate composite for those with info at all three months
+# hq_participants <- dat[! is.na(summary_score), .N, by=list(participant_id, visit_month)][N==3, participant_id]
+# dat.hq <- dat[participant_id %in% hq_participants]
 
 
-# exclude visit months 0.5, -1 and -2
-dat <- dat[! visit_month %in% c(-2, -1, 0.5)]
+# dat.hq.total <- dat.hq[, list('total'=sum(summary_score)), by=list(participant_id, visit_month)]
+# dat.hq.total[, jittered := total + runif(.N, -0.5, 0.5)]
 
-# calculate composite for those with info at all three months
-hq_participants <- dat[! is.na(summary_score), .N, by=list(participant_id, visit_month)][N==3, participant_id]
-dat.hq <- dat[participant_id %in% hq_participants]
+# lowstart_pids <- unique(dat.hq.total[visit_month <= 6 & total <= 25, participant_id])
 
-
-dat.hq.total <- dat.hq[, list('total'=sum(summary_score)), by=list(participant_id, visit_month)]
-dat.hq.total[, jittered := total + runif(.N, -0.5, 0.5)]
-
-lowstart_pids <- unique(dat.hq.total[visit_month <= 6 & total <= 25, participant_id])
-
-ggplot(dat.hq.total[participant_id %in% lowstart_pids],
-    aes(x=visit_month, y=jittered, group=participant_id)) +
-    geom_line(alpha=0.1) +
-    labs(x='month', y='MDS composite score', title='score over time for initial score of 0')
+# ggplot(dat.hq.total[participant_id %in% lowstart_pids],
+#     aes(x=visit_month, y=jittered, group=participant_id)) +
+#     geom_line(alpha=0.1) +
+#     labs(x='month', y='MDS composite score', title='score over time for initial score of 0')
 
 
 ###
 
 # The following files relate to olink protein expression measured for participants
 
-# './proteomics-CSF-PPEA-D02/olink-explore/protein-expression/CSF-PPEA-D02_matrix_cardiometabolic.csv'
-# './proteomics-CSF-PPEA-D02/olink-explore/protein-expression/CSF-PPEA-D02_matrix_neurology.csv'
-# './proteomics-CSF-PPEA-D02/olink-explore/protein-expression/CSF-PPEA-D02_matrix_inflammation.csv'
-# './proteomics-CSF-PPEA-D02/olink-explore/protein-expression/CSF-PPEA-D02_matrix_oncology.csv'
 
-# './proteomics-CSF-PPEA-D01/olink-explore/protein-expression/CSF-PPEA-D01_matrix_cardiometabolic.csv'
-# './proteomics-CSF-PPEA-D01/olink-explore/protein-expression/CSF-PPEA-D01_matrix_inflammation.csv'
-# './proteomics-CSF-PPEA-D01/olink-explore/protein-expression/CSF-PPEA-D01_matrix_oncology.csv'
-# './proteomics-CSF-PPEA-D01/olink-explore/protein-expression/CSF-PPEA-D01_matrix_neurology.csv'
-
-# './proteomics-PLA-PPEA-D02/olink-explore/protein-expression/PLA-PPEA-D02_matrix_neurology.csv'
-# './proteomics-PLA-PPEA-D02/olink-explore/protein-expression/PLA-PPEA-D02_matrix_cardiometabolic.csv'
-# './proteomics-PLA-PPEA-D02/olink-explore/protein-expression/PLA-PPEA-D02_matrix_inflammation.csv'
-# './proteomics-PLA-PPEA-D02/olink-explore/protein-expression/PLA-PPEA-D02_matrix_oncology.csv'
-
-# './proteomics-PLA-PPEA-D01/olink-explore/protein-expression/PLA-PPEA-D01_matrix_neurology.csv'
-# './proteomics-PLA-PPEA-D01/olink-explore/protein-expression/PLA-PPEA-D01_matrix_cardiometabolic.csv'
-# './proteomics-PLA-PPEA-D01/olink-explore/protein-expression/PLA-PPEA-D01_matrix_inflammation.csv'
