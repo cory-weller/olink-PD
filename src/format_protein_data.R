@@ -2,6 +2,8 @@
 
 library(data.table)
 library(foreach)
+library(ggplot2)
+library(ggthemes)
 
 protein_quant_filename <- 'reports/protein_quantification.tsv'
 
@@ -101,32 +103,73 @@ setnames(dat.all, 'ENROLL_STUDY_ARM', 'ARM')
 
 ### OK
 
+ppmi1 <- unique(dat.all[STUDY=='PPMI-1']$ID)
+ppmi2 <- unique(dat.all[STUDY=='PPMI-2']$ID)
 
-'cardiometabolic' vs 'inflammation'
-'cardiometabolic' vs 'neurology'
-'cardiometabolic' vs 'oncology'
-'inflammation' vs 'neurology'
-'inflammation' vs 'oncology'
-'neurology' vs 'oncology'
+ppmi1 %in% ppmi2
 
+M4 <- fread('M4.txt')
+
+## 39/186 of the M4 genes are containd within the olink panel
+#  UniProt           panel
+#   P00568 cardiometabolic
+#   P04080 cardiometabolic
+#   P04792 cardiometabolic
+#   P05556 cardiometabolic
+#   P07339 cardiometabolic
+#   P17931 cardiometabolic
+#   Q04760 cardiometabolic
+#   Q9UBP4 cardiometabolic
+#   P36959    inflammation
+#   P52564    inflammation
+#   Q12765    inflammation
+#   Q9H008    inflammation
+#   Q9Y2J8    inflammation
+#   O95817       neurology
+#   P06733       neurology
+#   P07108       neurology
+#   P08758       neurology
+#   P09211       neurology
+#   P14868       neurology
+#   P15311       neurology
+#   P29218       neurology
+#   P30043       neurology
+#   P50135       neurology
+#   Q01469       neurology
+#   Q06323       neurology
+#   Q06830       neurology
+#   Q96IU4       neurology
+#   Q99497       neurology
+#   O14558        oncology
+#   O94760        oncology
+#   P09960        oncology
+#   P14136        oncology
+#   P15121        oncology
+#   P30041        oncology
+#   P40121        oncology
+#   P43490        oncology
+#   P51858        oncology
+#   Q00796        oncology
+#   Q99536        oncology
+
+# Merge in enrollment status
+
+# Look at delta-M4 vs enrollment status
+dat.all[, 'M4' := ifelse(UniProt %in% M4$UniProt, TRUE, FALSE)]
+
+# look at data that exists in quadruplicate
 quad_samples <- copy(dat.all[, .N, by=list(ID, UniProt, sampletype, month, STUDY)][N ==4, !c('N')])
 setkey(quad_samples, ID, UniProt, sampletype, month, STUDY)
 setkey(dat.all, ID, UniProt, sampletype, month, STUDY)
-
 quad_samples <- merge(dat.all, quad_samples)
-
-
 quad.wide <- dcast(quad_samples, ID+UniProt+sampletype+month+STUDY~mode, value.var='value')
-
 quad.sub <- quad.wide[month %in% c(0,12,24,36)]
 
-library(ggplot2)
-library(ggthemes)
 
-
+if(FALSE) {
 c_v_i <- ggplot(data=quad.sub) +
     geom_abline(slope=1, intercept=0, linetype='dashed', alpha=0.3) +
-    geom_point(shape=21, alpha=0.2, aes(x=cardiometabolic, y=inflammation, color=STUDY)) +
+    geom_point(alpha=0.3, aes(x=cardiometabolic, y=inflammation, color=STUDY, shape=UniProt)) +
     facet_grid(sampletype~month) +
     guides(color = guide_legend(override.aes = list(shape=15, alpha=1, size=3))) +
     theme_few(12) +
@@ -135,7 +178,7 @@ c_v_i <- ggplot(data=quad.sub) +
 
 c_v_n <- ggplot(data=quad.sub) +
     geom_abline(slope=1, intercept=0, linetype='dashed', alpha=0.3) +
-    geom_point(shape=21, alpha=0.2, aes(x=cardiometabolic, y=neurology, color=STUDY)) +
+    geom_point(alpha=0.3, aes(x=cardiometabolic, y=neurology, color=STUDY, shape=UniProt)) +
     facet_grid(sampletype~month) +
     guides(color = guide_legend(override.aes = list(shape=15, alpha=1, size=3))) +
     theme_few(12) +
@@ -144,7 +187,7 @@ c_v_n <- ggplot(data=quad.sub) +
 
 c_v_o <- ggplot(data=quad.sub) +
     geom_abline(slope=1, intercept=0, linetype='dashed', alpha=0.3) +
-    geom_point(shape=21, alpha=0.2, aes(x=cardiometabolic, y=oncology, color=STUDY)) +
+    geom_point(alpha=0.3, aes(x=cardiometabolic, y=oncology, color=STUDY, shape=UniProt)) +
     facet_grid(sampletype~month) +
     guides(color = guide_legend(override.aes = list(shape=15, alpha=1, size=3))) +
     theme_few(12) +
@@ -153,7 +196,7 @@ c_v_o <- ggplot(data=quad.sub) +
 
 i_v_n <- ggplot(data=quad.sub) +
     geom_abline(slope=1, intercept=0, linetype='dashed', alpha=0.3) +
-    geom_point(shape=21, alpha=0.2, aes(x=inflammation, y=neurology, color=STUDY)) +
+    geom_point(alpha=0.3, aes(x=inflammation, y=neurology, color=STUDY, shape=UniProt)) +
     facet_grid(sampletype~month) +
     guides(color = guide_legend(override.aes = list(shape=15, alpha=1, size=3))) +
     theme_few(12) +
@@ -162,7 +205,7 @@ i_v_n <- ggplot(data=quad.sub) +
 
 i_v_o <- ggplot(data=quad.sub) +
     geom_abline(slope=1, intercept=0, linetype='dashed', alpha=0.3) +
-    geom_point(shape=21, alpha=0.2, aes(x=inflammation, y=oncology, color=STUDY)) +
+    geom_point(alpha=0.3, aes(x=inflammation, y=oncology, color=STUDY, shape=UniProt)) +
     facet_grid(sampletype~month) +
     guides(color = guide_legend(override.aes = list(shape=15, alpha=1, size=3))) +
     theme_few(12) +
@@ -171,7 +214,7 @@ i_v_o <- ggplot(data=quad.sub) +
 
 n_v_o <- ggplot(data=quad.sub) +
     geom_abline(slope=1, intercept=0, linetype='dashed', alpha=0.3) +
-    geom_point(shape=21, alpha=0.2, aes(x=neurology, y=oncology, color=STUDY)) +
+    geom_point(alpha=0.3, aes(x=neurology, y=oncology, color=STUDY, shape=UniProt)) +
     facet_grid(sampletype~month) +
     guides(color = guide_legend(override.aes = list(shape=15, alpha=1, size=3))) +
     theme_few(12) +
@@ -184,18 +227,62 @@ ggsave(c_v_o, file='figs/cardio-v-onco.png', width=20, height=10, units='cm')
 ggsave(i_v_n, file='figs/inflammation-v-neuro.png', width=20, height=10, units='cm')
 ggsave(i_v_o, file='figs/inflammation-v-onco.png', width=20, height=10, units='cm')
 ggsave(n_v_o, file='figs/neuro-v-onco.png', width=20, height=10, units='cm')
+}
+
+
+# randomly select one value for duplicated proteins
+dat.all <- dat.all[dat.all[, .I[sample(.N, size=1)], by=list(ID, UniProt, sampletype, month, STUDY)]$V1]
+dat.wide <- dcast(dat.all, ARM+M4+ID+UniProt+month+STUDY~sampletype, value.var='value')
+
+ggplot(dat.wide, aes(x=PLA, y=CSF, color=M4)) +
+    geom_point(shape=21, alpha=0.3) +
+    facet_grid(.~ARM) +
+    geom_abline(intercept=0, slope=1)
+
+
+ggplot(dat.wide, aes(x=ARM, y=CSF-PLA, color=M4)) +
+    geom_violin()
+
+dat.wide[, 'CSF_minus_PLA' := CSF - PLA]
+dat.deltas <- dcast(dat.wide[, list('mean_CSF_minus_PLA' = mean(CSF - PLA, na.rm=T)), by=list(ARM, M4, UniProt)],
+        M4+UniProt~ARM, value.var='mean_CSF_minus_PLA')
+
+
+dat.deltas[, 'deltadelta' := (PD-`Healthy Control`)]
+dat.deltas <- dat.deltas[order(deltadelta)]
+dat.deltas <- dat.deltas[!is.na(deltadelta)]
+
+dat.deltas[abs(deltadelta) > 0.7, 'plotlabel' := UniProt]
+
+ggplot(dat.deltas, aes(x=UniProt, y=deltadelta, label=plotlabel, color=M4)) +
+    geom_point() +
+    geom_text_repel()
+
+candidates <- dat.deltas[abs(deltadelta)>0.7, UniProt]
+
+
+labeller <- c(
+    `TRUE`='After Baseline',
+    `FALSE`='Baseline',
+    `Healthy Control`='Healthy Control',
+    `PD`='PD Diagnosis'
+)
+ggplot(dat.wide[month %in% c(0,12,24,36)], aes(x=CSF, y=PLA, color=M4)) +
+    geom_point(shape=21, alpha=0.1) +
+    facet_grid(month>0~ARM, labeller=as_labeller(labeller)) +
+    guides(color = guide_legend(override.aes=c(shape=16, size=3, alpha=1)))
+
+facet_grid(. ~ LBLs, labeller = labeller(LBLs = new))
 
 
 
+dat.wide2 <- dcast(dat.wide[month %in% c(0,24)], ARM+M4+ID+UniProt+STUDY~month, value.var=c('CSF','PLA'))
+dat.wide2[, deltaCSF := CSF_24 - CSF_0]
+dat.wide2[, deltaPLA := PLA_24 - PLA_0]
 
-
-
-
-
-
-
-
-
+ggplot(dat.wide2, aes(x=deltaCSF, y=deltaPLA, color=M4)) +
+    geom_point(shape=21, alpha=0.4) +
+    facet_grid(.~ARM)
 
 
 ## look at replication
