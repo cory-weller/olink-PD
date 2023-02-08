@@ -18,7 +18,7 @@ module load R/3.6.3
 Rscript src/combine_mds_scores.R
 ```
 
-[`M4.tsv`](reports/M4.tsv) derived from [Supplementary Table `2B_ModuleAssignments`](https://doi.org/10.1038/s41591-020-0815-6) in Johnson et al. (2020)[^1] where column `kMEtableSortVector %like% 'M4'`. 
+[`M4.tsv`](reports/M4.tsv) derived from [Supplementary Table `2B_ModuleAssignments`](https://doi.org/10.1038/s41591-020-0815-6)[^1] where column `kMEtableSortVector %like% 'M4'`. 
 
 
 [^1]: Johnson, E.C.B., Dammer, E.B., Duong, D.M. et al. Large-scale proteomic analysis of Alzheimer’s disease brain and cerebrospinal fluid reveals early changes in energy metabolism associated with microglia and astrocyte activation. Nat Med 26, 769–780 (2020). https://doi.org/10.1038/s41591-020-0815-6
