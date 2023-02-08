@@ -80,6 +80,8 @@ load_enrollment_data <- function(cohort) {
     return(dat.out)
 }
 
+
+## LOAD AND FORMAT #################################################################################
 dat <- load_protein_data()
 dat[, ID := paste0(PD_or_PP, '-', participant_id)]
 setkey(dat, ID)
@@ -92,7 +94,7 @@ pdbp <- merge(dat, pdbp_ids)
 
 dat.all <- rbindlist(list(ppmi, pdbp))
 dat.all[participant_id == 'PDZZ318BWK', .N, by=COHORT]
-dat.all[, STUDY := paste0(COHORT, '-', D)]
+dat.all[, STUDY := paste0(COHORT, D)]
 
 dat.all[, D := NULL]
 dat.all[, participant_id := NULL]
@@ -101,14 +103,16 @@ dat.all[, PD_or_PP := NULL]
 setnames(dat.all, 'ENROLL_STUDY_ARM', 'ARM')
 
 
-### OK
+## OK ##############################################################################################
 
-ppmi1 <- unique(dat.all[STUDY=='PPMI-1']$ID)
-ppmi2 <- unique(dat.all[STUDY=='PPMI-2']$ID)
+ppmi1 <- unique(dat.all[STUDY=='PPMI1']$ID)
+ppmi2 <- unique(dat.all[STUDY=='PPMI2']$ID)
 
-ppmi1 %in% ppmi2
 
-M4 <- fread('M4.txt')
+in_both_ppmi <- intersect(ppmi1, ppmi2)
+
+# Check M4 
+M4 <- fread('reports/M4.tsv')
 
 ## 39/186 of the M4 genes are containd within the olink panel
 #  UniProt           panel
@@ -231,58 +235,98 @@ ggsave(n_v_o, file='figs/neuro-v-onco.png', width=20, height=10, units='cm')
 
 
 # randomly select one value for duplicated proteins
+set.seed(100)
 dat.all <- dat.all[dat.all[, .I[sample(.N, size=1)], by=list(ID, UniProt, sampletype, month, STUDY)]$V1]
 dat.wide <- dcast(dat.all, ARM+M4+ID+UniProt+month+STUDY~sampletype, value.var='value')
 
-ggplot(dat.wide, aes(x=PLA, y=CSF, color=M4)) +
-    geom_point(shape=21, alpha=0.3) +
-    facet_grid(.~ARM) +
-    geom_abline(intercept=0, slope=1)
-
-
-ggplot(dat.wide, aes(x=ARM, y=CSF-PLA, color=M4)) +
-    geom_violin()
-
-dat.wide[, 'CSF_minus_PLA' := CSF - PLA]
-dat.deltas <- dcast(dat.wide[, list('mean_CSF_minus_PLA' = mean(CSF - PLA, na.rm=T)), by=list(ARM, M4, UniProt)],
-        M4+UniProt~ARM, value.var='mean_CSF_minus_PLA')
-
-
-dat.deltas[, 'deltadelta' := (PD-`Healthy Control`)]
-dat.deltas <- dat.deltas[order(deltadelta)]
-dat.deltas <- dat.deltas[!is.na(deltadelta)]
-
-dat.deltas[abs(deltadelta) > 0.7, 'plotlabel' := UniProt]
-
-ggplot(dat.deltas, aes(x=UniProt, y=deltadelta, label=plotlabel, color=M4)) +
-    geom_point() +
-    geom_text_repel()
-
-candidates <- dat.deltas[abs(deltadelta)>0.7, UniProt]
-
-
+# Look at M4 proteins
 labeller <- c(
     `TRUE`='After Baseline',
     `FALSE`='Baseline',
     `Healthy Control`='Healthy Control',
     `PD`='PD Diagnosis'
 )
-ggplot(dat.wide[month %in% c(0,12,24,36)], aes(x=CSF, y=PLA, color=M4)) +
+g.M4_A <- ggplot(dat.wide[month %in% c(0,12,24,36)], aes(x=CSF, y=PLA, color=M4)) +
     geom_point(shape=21, alpha=0.1) +
     facet_grid(month>0~ARM, labeller=as_labeller(labeller)) +
+    scale_color_discrete(name='M4 Module') +
+    labs(x='CSF', y='Plasma') +
     guides(color = guide_legend(override.aes=c(shape=16, size=3, alpha=1)))
-
-facet_grid(. ~ LBLs, labeller = labeller(LBLs = new))
-
+ggsave(g.M4_A, file='figs/M4_A.jpg', width=20, height=20, units='cm')
 
 
-dat.wide2 <- dcast(dat.wide[month %in% c(0,24)], ARM+M4+ID+UniProt+STUDY~month, value.var=c('CSF','PLA'))
-dat.wide2[, deltaCSF := CSF_24 - CSF_0]
-dat.wide2[, deltaPLA := PLA_24 - PLA_0]
+labeller <- c(
+    `TRUE`='in M4 module',
+    `FALSE`='not in M4 module',
+    `Healthy Control`='Healthy Control',
+    `PD`='PD Diagnosis'
+)
+dat.all[, month := as.factor(month)]
+g.M4_B <- ggplot(dat.all[month %in% c(0,24)], aes(x=month, y=value, color=sampletype)) +
+    geom_boxplot() +
+    scale_color_discrete(
+            name='Sample Type',
+            labels=c(`CSF`='CSF', `PLA`='Plasma')) +
+    labs(x='Month', y='Olink Quantification Value') +
+    facet_grid(M4~ARM, labeller=as_labeller(labeller))
+ggsave(g.M4_B, file='figs/M4_B.png', width=16, height=16, units='cm')
 
-ggplot(dat.wide2, aes(x=deltaCSF, y=deltaPLA, color=M4)) +
-    geom_point(shape=21, alpha=0.4) +
-    facet_grid(.~ARM)
+
+# look at consistency within individuals `in_both_ppmi`
+
+dat.bothppmi <- dat.all[ID %in% in_both_ppmi]
+
+dat.bothppmi.wide <- dcast(dat.bothppmi, ID+UniProt+mode+sampletype+month+ARM+M4~STUDY, value.var='value')
+
+ggplot(dat.bothppmi.wide[sampletype=='CSF' & month==0], aes(x=`PPMI1`, y=`PPMI2`)) +
+geom_point() +
+facet_wrap(~ID) +
+theme_few(12) +
+scale_x_continuous(breaks=0, labels=NULL) +
+scale_y_continuous(breaks=0, labels=NULL) +
+labs(title='CSF measurement reproducibility at baseline')
+
+# Baseline correlation
+correlations <- dat.bothppmi.wide[, list('cor'=cor(PPMI1, PPMI2, use='pairwise.complete.obs')), by=list(ID,sampletype,ARM,month)]
+correlations[, 'cor_label' := substr(cor, 1, 4)]
+dat.bothppmi.wide[, ID := factor(ID)]
+
+plot_correlation <- function(i.sampletype, i.month) {
+    g <- ggplot(dat.bothppmi.wide[sampletype==i.sampletype & month==i.month], aes(x=`PPMI1`, y=`PPMI2`, color=ARM)) +
+    geom_point() +
+    geom_text_repel(data=correlations[sampletype==i.sampletype & month==i.month], 
+                color='black', 
+                aes(x=Inf, hjust=1,
+                    y=-Inf, vjust=0,
+                    label=cor_label
+                )
+            ) +
+    facet_wrap(~ID, drop=FALSE) +
+    theme_few(10) +
+    scale_x_continuous(breaks=0, labels=NULL) +
+    scale_y_continuous(breaks=0, labels=NULL) +
+    labs(title=paste0(i.sampletype, ' measurement reproducibility at month ', i.month)) +
+    geom_abline(slope=1, intercept=0, linetype='dashed', alpha=0.3)
+    ggsave(g, file=paste0('figs/correlation_', i.sampletype, '_month', i.month, '.png'),
+                width=20, height=20, units='cm')
+}
+plot_correlation('PLA', 0)
+plot_correlation('PLA', 12)
+plot_correlation('PLA', 24)
+plot_correlation('CSF', 0)
+plot_correlation('CSF', 12)
+plot_correlation('CSF', 24)
+
+g.all_correlation <- ggplot(correlations, aes(x=1, y=cor, color=ARM)) +
+    geom_beeswarm(shape=21, alpha=0.8) +
+    facet_grid(sampletype~month, switch='x') +
+    theme_few() +
+    scale_x_continuous(breaks=0, labels=NULL) +
+    ylim(0,1) +
+    labs(x=NULL, y='Correlation')
+
+ggsave(g.all_correlation, file='figs/correlation_all.png', width=25, height=15, units='cm')
+
 
 
 ## look at replication
