@@ -1,5 +1,7 @@
 #!/usr/bin/env Rscript
+# install.packages('OlinkAnalyze', repos='http://cran.us.r-project.org')"
 
+library(OlinkAnalyze)
 library(data.table)
 library(foreach)
 library(ggplot2)
@@ -80,7 +82,6 @@ load_enrollment_data <- function(cohort) {
     return(dat.out)
 }
 
-
 ## LOAD AND FORMAT #################################################################################
 dat <- load_protein_data()
 dat[, ID := paste0(PD_or_PP, '-', participant_id)]
@@ -104,9 +105,20 @@ setnames(dat.all, 'ENROLL_STUDY_ARM', 'ARM')
 
 
 ## OK ##############################################################################################
-
+dat.all[, 'ppea' := NULL]
 ppmi1 <- unique(dat.all[STUDY=='PPMI1']$ID)
 ppmi2 <- unique(dat.all[STUDY=='PPMI2']$ID)
+
+bridges <- intersect(ppmi1, ppmi2)
+
+ppmi1.dat <- dat.all[STUDY=='PPMI1']
+ppmi2.dat <- dat.all[STUDY=='PPMI2']
+
+setkey(ppmi1.dat, ID, sampletype, month, mode, UniProt, ARM, PHENO, SEX)
+setkey(ppmi2.dat, ID, sampletype, month, mode, UniProt, ARM, PHENO, SEX)
+ppmi.merge <- merge(ppmi1.dat, ppmi2.dat)
+
+ggplot(ppmi.merge[PHENO==1], aes(x=value.x, y=value.y, color=mode, shape=sampletype)) + geom_point()
 
 
 in_both_ppmi <- intersect(ppmi1, ppmi2)
