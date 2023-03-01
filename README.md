@@ -95,5 +95,7 @@ Same data but plotted as beeswarms.
 </details>
 
 
+
+
 # Citations
 [^1]: Johnson, E.C.B., Dammer, E.B., Duong, D.M. et al. Large-scale proteomic analysis of Alzheimer’s disease brain and cerebrospinal fluid reveals early changes in energy metabolism associated with microglia and astrocyte activation. Nat Med 26, 769–780 (2020). https://doi.org/10.1038/s41591-020-0815-6
